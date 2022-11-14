@@ -4,8 +4,8 @@ import jwt from 'jsonwebtoken'
 import Person from './personModel.js'
 
 const modelPostSchema = new mongoose.Schema({
-message: String,
-image: {
+post: String,
+img: {
     url: String,
     public_id: String,
 },

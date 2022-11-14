@@ -8,15 +8,17 @@ import Profile from '../model/profileModel.js'
 
 
 export const registerUser = async (req, res) =>{
+    
     try {
+        
         const { name, email, password } = req.body
 
+        console.log({ email, password, name })
         if(!name || !email || !password){
             res.status(400).json({message:  'please add all fields'})
         }
 
         const userExist = await Person.findOne({ email })
-
         if(userExist){
             res.status(400).json({message:  'user already exist'})
         }
@@ -25,24 +27,20 @@ export const registerUser = async (req, res) =>{
 
         const hashPassword = await bcrypt.hash(password, salt)
 
-        
 
         const user = await Person.create({
             name, 
             email,
             password: hashPassword,
-            
-    
         })
+        console.log(user)
+        const token = generateToken(user._id)
 
-     if(user){
         res.status(201).json({ 
-            _id: user.id,
-            name: user.name,
-            email: user.email,
-            token: generateToken(user._id),
+            user,
+            token
          }) 
-     }   
+ 
         
     } catch (error) {
         res.status(500).json({ message: error.message})
@@ -58,32 +56,34 @@ return jwt.sign( {_id}, process.env.JWT_SECRET, {
 export const login = async (req, res) => {
     try {
      const   { email, password } = req.body
+     console.log({ email, password })
 
         if(!email || !password){
             res.status(400)
             throw new Error('please include your email and password')
         }
         
-        const userExist = await Person.findOne({ email })
+        const user = await Person.findOne({ email })
 
-        if(!userExist){
+        if(!user){
             res.status(400)
             throw new Error(' user does not exist')
         }
 
-        const passwordMatch = await bcrypt.compare(password, userExist.password)
+        const passwordMatch = await bcrypt.compare(password, user.password)
 
         if(!passwordMatch){
             res.status(400)
             throw new Error('password do not match')
         }
 
-       const token = generateToken(userExist._id)
-
+       const token = generateToken(user._id)
+       console.log(user)
+       console.log(token)
        res.status(200).cookie('token', token, {
            expires: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)
        , httpOnly: true }).json({
-           userExist, 
+           user, 
            token,
        })
 
@@ -109,7 +109,7 @@ export const logout = async(req, res) => {
 
 export const deleteUser = async(req, res) => {
     try {
-        const user = await Person.findById(req.user._id)
+        const user = await Person.findById(req.user._id).select('-password')
 
         const post = user.posts;
 
@@ -136,10 +136,43 @@ export const deleteUser = async(req, res) => {
     }
 }
 
+export const allUser = async(req, res) => {
+    try {
+       const allusers = await Person.find().select('-password').populate('profile').exec()
+console.log(allusers)
+       res.status(200).json(allusers)
+    } catch (error) {
+        res.status(500)
+        throw new Error(error) 
+    }
+}
+
+export const findFollowing = async(req, res) => {
+    try {
+       const user = await Person.find({ _id: req.user._id }).select('-password').populate('following').exec()
+console.log(user)
+       res.status(200).json(user)
+    } catch (error) {
+        res.status(500)
+        throw new Error(error) 
+    }
+}
+
+export const findFollowers = async(req, res) => {
+    try {
+       const user = await Person.find({ _id: req.user._id }).select('-password').populate('followers').exec()
+console.log(user)
+       res.status(200).json(user)
+    } catch (error) {
+        res.status(500)
+        throw new Error(error) 
+    }
+}
+
 export const followAndUnfollowUser = async(req, res) => {
     try {
 
-        const user = await Person.findById(req.user._id)
+        const user = await Person.findById(req.user._id).select('-password')
 
         if(req.params.id.toString() === req.user._id.toString()){
             res.status(405)
@@ -162,7 +195,7 @@ export const followAndUnfollowUser = async(req, res) => {
 
           otheruser.followers.splice(otherIndex, 1)
           await otheruser.save()
-
+ console.log({user, otheruser})
           res.status(200).json({
             message: 'user unfollowed',
             user,
@@ -174,7 +207,7 @@ export const followAndUnfollowUser = async(req, res) => {
             
             otheruser.followers.push(user._id)
             await otheruser.save()
-
+           console.log({user, otheruser})
             res.status(200).json({
                 message: 'user followed',
                 user,

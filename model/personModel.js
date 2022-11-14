@@ -20,6 +20,13 @@ const personSchema = mongoose.Schema({
           ref: 'ModelPost'
        }
    ],
+   profile:{
+     type: [ {
+   type: mongoose.Schema.Types.ObjectId,
+   ref: 'Profile'
+} ],
+validate: [(val) => val.length <= 1, 'only one profile need'],
+},
    followers: [
     {
         type: mongoose.Schema.Types.ObjectId,
@@ -32,6 +39,19 @@ following: [
         ref: 'Person',
     }
 ],
+handle: {
+    type: String,
+    unique: true
+},
+bio: String,
+profilepics:  {
+    url: String,
+    public_id: String,
+},
+coverphoto: {
+    url: String,
+    public_id: String,
+},
 },{
     timestamps: true,
 })

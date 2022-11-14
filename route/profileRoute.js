@@ -17,47 +17,66 @@ const profileRouter = express.Router()
 
 //create user profile
 
- profileRouter.route('/create').post( protect, uploadImage.array('image', 5), async (req, res) => {
- 
+profileRouter.route('/create').post( protect, uploadImage.array('image', 3), async (req, res, next) => {
+
     try {
+        console.log(req.files)
+        const {handle, bio, location} = req.body
+        console.log({handle, bio, location})
+        console.log(req.user._id)
+
         const uploader = async(path) => await uploads(path, 'Images')
-
+        const urls = []
         if(req.method === 'POST'){
-            const urls = []
-
+            
             //req.files is an array
             const files = req.files
             
-
             for(const file of files){
                 const { path } = file
 
                 const newPath = await uploader(path)
                
-
                urls.push(newPath)
 
                fs.unlinkSync(path)
            }  
-
-           const createProfile = await Profile.create({
-            handle: req.body.handle,
-            bio: req.body.bio,
-            location: req.body.location,
-            profilepics:  {
-                url: urls[0].url,
-                public_id: urls[0].id,
-            },
-            coverphoto: {
-                url: urls[1].url,
-                public_id: urls[1].id,
-            },
-            owner: req.user._id,
-        })
+             console.log(urls)
+             console.log({handle, bio, location})
+             const pro = await Profile.create({
+                 handle: req.body.handle,
+                 bio: req.body.bio,
+                 location: req.body.location,
+                 profilepics: {
+                     url: urls[0].url,
+                     public_id: urls[0].id,
+                 },
+                 coverphoto: {
+                    url: urls[1].url,
+                    public_id: urls[1].id,
+                },
+                owner: req.user._id
+             })
+ 
+             
+             console.log(pro)
+             const user = await Person.findById(req.user._id)
+             user.profile.push(pro._id)
+             user.handle = pro.handle
+             user.bio = pro.bio
+            console.log(user.profilepics)
+             user.profilepics.url = pro.profilepics.url
+             user.profilepics.public_id = pro.profilepics.public_id
+             user.coverphoto.url = pro.coverphoto.url
+             user.coverphoto.public_id = pro.coverphoto.public_id
+             await user.save()
+             console.log(user.profilepics)
+             console.log(pro.profilepics)
 
                 res.status(200).json({
-                    message: 'image upload sucessful',
-                  createProfile,
+                    message: 'profile created',
+                   pro,
+                   user
                 })
           
         }else{
@@ -70,17 +89,17 @@ const profileRouter = express.Router()
 
     } catch (error) {
         res.status(500)
-        throw new Error(error)
+        throw new Error(error.stack)
     }
 })
 
 //get my profile
-profileRouter.route('/myprofile/:id').get( async(req, res) => {
+profileRouter.route('/me').get( protect, async(req, res) => {
     try {
-        const fetchProfile = await Profile.find({ owner: req.params.id})
-
+        const fetchProfile = await Profile.find({ owner: req.user._id})
+console.log(fetchProfile)
         res.status(200).json({
-            message: 'others post fetched',
+            message: 'others profile fetched',
             fetchProfile,
         })
     } catch (error) {
@@ -89,112 +108,84 @@ profileRouter.route('/myprofile/:id').get( async(req, res) => {
     }
 })
 
-//updating profilepics
-profileRouter.route('/updateprofilepics/:id').put(protect, uploadImage.single('image'), async (req, res) => {
-
-
+profileRouter.route('/').get(protect, async(req, res) => {
     try {
-
-        const profile = await Profile.findOne({ owner: req.user._id })
-        if(!profile){
-            res.status(404)
-            throw new Error('profile not found!')
-        }
-
-        var ids = profile.profilepics.public_id;
-
-        const deleted = await cloudinary.v2.uploader.destroy(ids)
-        console.log(deleted)  
-
-const result = await cloudinaryz.v2.uploader.upload(req.file.path)
-
-
-
-   const updateProfile = await Profile.findByIdAndUpdate(profile._id, {
-    profilepics:  {
-        url: result.secure_url,
-        public_id: result.public_id,
-    },
-    
-}, { new: true })
-
-        res.status(200).json({
-            message: 'profile pics updated successfully',
-            updateProfile,
-        })
-
+       const allprofile = await Profile.find({ owner: { $ne: req.user._id }})
+console.log(allprofile)
+       res.status(200).json(allprofile)
     } catch (error) {
         res.status(500)
-        throw new Error(error)
+        throw new Error(error) 
     }
-
-  
-})
+}) 
 
 
-//updating coverphoto
-profileRouter.route('/updatecoverphoto/:id').put(protect, uploadImage.single('image'), async (req, res) => {
-
-
+profileRouter.route('/update').put(protect, uploadImage.array('image', 3), async(req, res) => {
     try {
+        console.log(req.files)
+        console.log(req.body)
+        const uploader = async(path) => await uploads(path, 'Images')
+        const urls = []
+        if(req.method === 'PUT'){
+            
+            //req.files is an array
+            const files = req.files
+            
+            for(const file of files){
+                const { path } = file
+
+                const newPath = await uploader(path)
+               
+               urls.push(newPath)
+
+               fs.unlinkSync(path)
+           }  
+             console.log(urls)
 
         const profile = await Profile.findOne({ owner: req.user._id })
-        if(!profile){
-            res.status(404)
-            throw new Error('profile not found!')
-        }
-
-        var ids = profile.coverphoto.public_id;
-
-const deleted = await cloudinary.v2.uploader.destroy(ids)
-
-console.log(deleted)
-
-const result = await cloudinaryz.v2.uploader.upload(req.file.path)
-
-
-
-   const updateProfile = await Profile.findByIdAndUpdate(profile._id, {
-    coverphoto:  {
-        url: result.secure_url,
-        public_id: result.public_id,
-    },
-    
-}, { new: true })
-
-        res.status(200).json({
-            message: 'coverphoto updated successfully',
-            updateProfile,
-        })
-
-    } catch (error) {
-        res.status(500)
-        throw new Error(error)
-    }
-
-  
-})
-
-profileRouter.route('/update/:id').put(protect, async(req, res) => {
-    try {
-        const profile = await Profile.findOne({ owner: req.user._id })
-
+        console.log(profile)
         if(!profile){
             res.status(404)
             throw new Error('profile do not exist')
         }
 
         const updatedProfile = await Profile.findByIdAndUpdate(profile._id, {
-            handle: req.body.handle ? req.body.handle : profile.hbioandle,
-            bio: req.body.bio ? req.body.bio : profile.bio,
-            location: req.body.location ? req.body.location : profile.location,
+            handle: req.body.handle,
+            bio: req.body.bio,
+            location: req.body.location,
+            profilepics: {
+                url: urls[0].url,
+                public_id: urls[0].id,
+            },
+            coverphoto: {
+               url: urls[1].url,
+               public_id: urls[1].id,
+           },
         }, { new: true })
 
+        console.log(updatedProfile)
+
+        const user = await Person.findById(req.user._id)
+        user.handle = updatedProfile.handle
+        user.bio = updatedProfile.bio
+        user.profilepics.url = updatedProfile.profilepics.url
+        user.profilepics.public_id = updatedProfile.profilepics.public_id
+        user.coverphoto.url = updatedProfile.coverphoto.url
+        user.coverphoto.public_id = updatedProfile.coverphoto.public_id
+        await user.save()
 
         res.status(200).json({
             message: 'profile updated',
             updatedProfile,
         })
+
+            
+    }else{
+        res.status(405).json({
+            err: 'image upload not sucessful',
+            
+        })
+    }
     } catch (error) {
         res.status(500)
         throw new Error(error)

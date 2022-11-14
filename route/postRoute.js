@@ -23,20 +23,21 @@ dotenv.config()
 
 const postRouter = express.Router()
 
-postRouter.route('/post/create').post( protect, uploadImage.single('image'), async (req, res, next) => {
-  
-   try {
-        const result = await cloudinary.v2.uploader.upload(req.file.path)
+postRouter.route('/post/create').post( protect, uploadImage.single('img'), async (req, res) => {
+  console.log(req.file)
+  console.log(req.body)
+  try {
+        const result = await cloudinary.uploader.upload(req.file.path)
        console.log(result)
        const postz = await ModelPost.create({
-           message: req.body.message,
-           image: {
+           post: req.body.post,
+           img: {
                url: result.secure_url,
                public_id: result.public_id
            },
            owner: req.user._id
        })
-
+       console.log(postz)
 
     const user = await Person.findById(req.user._id)
 
@@ -46,10 +47,8 @@ postRouter.route('/post/create').post( protect, uploadImage.single('image'), asy
 
 
 
-       res.status(200).json({
-           postz,
-           user, 
-         
+       res.status(201).json({
+           postz
         })
    } catch (error) {
        console.log({ message: error.message})
@@ -57,23 +56,20 @@ postRouter.route('/post/create').post( protect, uploadImage.single('image'), asy
 } )
 
 //update post
-postRouter.route('/postupdate/:id').put(protect, uploadImage.single('image'), async (req, res, next) =>{
+postRouter.route('/postupdate/:id').put(protect, uploadImage.single('img'), async (req, res, next) =>{
     try {
+        console.log(req.file)
         const oldId = await ModelPost.findById(req.params.id)
-
         console.log(oldId)
-
-        await cloudinary.v2.uploader.destroy(oldId.image.public_id)
-
-        const result = await cloudinary.v2.uploader.upload(req.file.path)
-
+     if(req.file.path) {  
+         await cloudinary.uploader.destroy(oldId.img.public_id) 
+        const result = await cloudinary.uploader.upload(req.file.path)
         console.log(result)
-
         const postData = {
-            message: req.body.message || oldId.message ,
-            image:  {
-                url: result.secure_url || oldId.image.url,
-                public_id: result.public_id || oldId.image.public_id,
+            post: req.body.post || oldId.post ,
+            img:  {
+                url: result.url || oldId.img.url,
+                public_id: result.public_id || oldId.img.public_id,
             },
             owner: req.user._id,
         }
@@ -84,8 +80,31 @@ postRouter.route('/postupdate/:id').put(protect, uploadImage.single('image'), as
         }
        
         const updatedPost = await ModelPost.findByIdAndUpdate(req.params.id, postData, {new: true})
+        console.log(updatedPost)
       
-        res.status(201).json({updatedPost})
+        res.status(200).json({updatedPost})
+    }else{
+      const result = oldId.img
+       console.log(result)
+       const postData = {
+        post: req.body.post || oldId.post ,
+        img:  {
+            url: result.url || oldId.img.url,
+            public_id: result.public_id || oldId.img.public_id,
+        },
+        owner: req.user._id,
+    }
+
+    if(oldId.owner.toString() !== req.user._id.toString()){
+        res.status(409)
+        throw new Error('not authorized')
+    }
+   
+    const updatedPost = await ModelPost.findByIdAndUpdate(req.params.id, postData, {new: true})
+    console.log(updatedPost)
+  
+    res.status(200).json({updatedPost})
+    } 
 
     } catch (error) {
         res.status(500).json({ message: error.message})
@@ -97,8 +116,6 @@ postRouter.route('/postupdate/:id').put(protect, uploadImage.single('image'), as
 postRouter.route('/deletepost/:id').delete(protect,  async (req, res) =>{
     try {
 
-      
-
         const post = await ModelPost.findById(req.params.id)
 
         if(post.owner.toString() !== req.user._id.toString()){
@@ -108,25 +125,66 @@ postRouter.route('/deletepost/:id').delete(protect,  async (req, res) =>{
        
         const deletedPost = await ModelPost.findByIdAndRemove(req.params.id)
       
-        res.status(201).json({message: 'post deleted'})
+        res.status(200).json({
+            message: 'post deleted',
+             post
+            })
 
     } catch (error) {
         res.status(500).json({ message: error.message})
     }
 })
 
-//get my post and post of following and followers
+//get my post and post of following 
 postRouter.route('/allpost').get( protect, async (req, res) => {
     try {
         
         const user = await Person.findById(req.user._id)
 
-        let ids = user.following && user.followers && user._id
+        let ids = [...user.following, user._id]
 
+          
+          console.log(ids)
         const allPost = await  ModelPost.find({ owner: {
-            $in: ids
+            $in: ids,
         } }).sort({ createdAt: -1 }).populate('owner').exec()
 
+        res.status(200).json({
+            allPost
+        })
+    } catch (error) {
+        console.log(error.message)
+    }
+
+})
+
+//get each post of your 
+postRouter.route('/post/:id').get( protect, async (req, res) => {
+    try {
+  
+          
+        const allPost = await  ModelPost.find({ owner: {
+            $in: req.params.id,
+        } }).sort({ createdAt: -1 }).populate('owner').exec()
+         console.log(allPost)
+        res.status(200).json({
+            allPost
+        })
+    } catch (error) {
+        console.log(error.message)
+    }
+
+})
+
+//get my post 
+postRouter.route('/mypost').get( protect, async (req, res) => {
+    try {
+  
+          
+        const allPost = await  ModelPost.find({ owner: {
+            $in: req.user._id,
+        } }).sort({ createdAt: -1 }).populate('owner').exec()
+         console.log(allPost)
         res.status(200).json({
             allPost
         })
@@ -141,20 +199,22 @@ postRouter.route('/post/likes/:id').put(protect, async(req, res) => {
     try {
         const user = await Person.findById(req.user._id)
         const post = await ModelPost.findById(req.params.id)
-
+ 
 
         if(post.likes.includes(user._id)){
             const findIndex = post.likes.indexOf(user._id)
             post.likes.splice(findIndex, 1)
             await post.save()
+            const  liked = post.likes
+            res.status(200).json({ post })
         }else{
             post.likes.push(user._id)
             await post.save()
+             const  liked = post.likes
+            res.status(200).json({ post })
         }
 
-        res.status(200).json({
-            post
-        })
+      
     } catch (error) {
         res.status(500)
         throw new Error(error)
@@ -163,6 +223,8 @@ postRouter.route('/post/likes/:id').put(protect, async(req, res) => {
 
 postRouter.route('/comment/:id').post(protect, async (req, res) => {
     try {
+        console.log(req.body)
+        console.log(req.params.id)
         const post = await ModelPost.findById(req.params.id) // not req.user._id because the post should be any post, not just the users post
 
         if(!post){
@@ -171,14 +233,16 @@ postRouter.route('/comment/:id').post(protect, async (req, res) => {
         }
     
             post.comments.push({
-                comment: req.body.comment,
-                user: req.user._id,
+               user: req.user._id,
+             comment: req.body.comment,
+                
             })
 
             await post.save()
+            console.log(post.comments)
             res.status(200).json({
                 message: 'comment added',
-                post
+               comments: post.comments,
             })
         
 
