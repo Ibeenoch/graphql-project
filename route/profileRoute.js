@@ -17,7 +17,7 @@ const profileRouter = express.Router()
 
 //create user profile
 
-profileRouter.route('/create').post( protect, uploadImage.array('image', 3), async (req, res, next) => {
+profileRouter.route('/create').post( protect , uploadImage.array('image', 5), async (req, res, next) => {
 
     try {
         console.log(req.files)
@@ -43,6 +43,12 @@ profileRouter.route('/create').post( protect, uploadImage.array('image', 3), asy
            }  
              console.log(urls)
              console.log({handle, bio, location})
+
+             if(!urls[0] || !urls[1] ){
+                  res.status(400)
+                  throw new Error('photos not found')
+             }
+             
              const pro = await Profile.create({
                  handle: req.body.handle,
                  bio: req.body.bio,

@@ -33,14 +33,14 @@ export const registerUser = async (req, res) =>{
             email,
             password: hashPassword,
         })
+
         console.log(user)
         const token = generateToken(user._id)
-
-        res.status(201).json({ 
-            user,
-            token
-         }) 
  
+         res.status(201).json({
+            user, 
+            token,
+        })
         
     } catch (error) {
         res.status(500).json({ message: error.message})
@@ -48,9 +48,7 @@ export const registerUser = async (req, res) =>{
 }
 
 const generateToken = (_id) => {
-return jwt.sign( {_id}, process.env.JWT_SECRET, {
-    expiresIn: '5d'
-})
+return jwt.sign( {_id}, process.env.JWT_SECRET)
 }
 
 export const login = async (req, res) => {
@@ -80,9 +78,7 @@ export const login = async (req, res) => {
        const token = generateToken(user._id)
        console.log(user)
        console.log(token)
-       res.status(200).cookie('token', token, {
-           expires: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)
-       , httpOnly: true }).json({
+       res.status(200).cookie('token', token, { expires: new Date(Date.now() + 3*60*60*1000), httpOnly: true }).json({
            user, 
            token,
        })
@@ -108,21 +104,28 @@ export const logout = async(req, res) => {
 }
 
 export const deleteUser = async(req, res) => {
+console.log('deleted user')
+
     try {
         const user = await Person.findById(req.user._id).select('-password')
 
         const post = user.posts;
-
-        for( let i=0; i<post.length; i++){
-            const posts = await ModelPost.findById(post[i])
-            await posts.remove()
-        }
         
+        for( let i=0; i<post.length; i++){
+            console.log(post)
+            await ModelPost.findById(post[i]).remove()
+        
+
+        }
+        console.log('Post deleted')
         const profile = await Profile.findOne({ owner: req.user._id })
 
        await profile.remove()
-
+       console.log('profile deleted')
+       
         await user.remove()
+        console.log('user deleted')
+
 
         res.status(200).json({
             message: 'user deleted'
@@ -161,6 +164,17 @@ console.log(user)
 export const findFollowers = async(req, res) => {
     try {
        const user = await Person.find({ _id: req.user._id }).select('-password').populate('followers').exec()
+console.log(user)
+       res.status(200).json(user)
+    } catch (error) {
+        res.status(500)
+        throw new Error(error) 
+    }
+}
+
+export const findAUser = async(req, res) => {
+    try {
+       const user = await Person.find({ _id: req.params.id }).select('-password').exec()
 console.log(user)
        res.status(200).json(user)
     } catch (error) {
@@ -222,3 +236,4 @@ export const followAndUnfollowUser = async(req, res) => {
         throw new Error(error)
     }
 }
+
