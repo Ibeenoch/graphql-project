@@ -27,29 +27,44 @@ postRouter.route('/post/create').post( protect, uploadImage.single('img'), async
   console.log(req.file)
   console.log(req.body)
   try {
-        const result = await cloudinary.uploader.upload(req.file.path)
-       console.log(result)
-       const postz = await ModelPost.create({
-           post: req.body.post,
-           img: {
-               url: result.secure_url,
-               public_id: result.public_id
-           },
-           owner: req.user._id
-       })
-       console.log(postz)
 
-    const user = await Person.findById(req.user._id)
-
-    user.posts.push(postz._id)
-    await user.save()
-
-
-
-
-       res.status(201).json({
-           postz
+    if(!req.file){
+        const postz = await ModelPost.create({
+            post: req.body.post,
+            owner: req.user._id
         })
+        console.log(postz)
+ 
+     const user = await Person.findById(req.user._id)
+ 
+     user.posts.push(postz._id)
+     await user.save()
+        res.status(201).json({
+            postz
+         })
+    }
+   
+    if(req.file){
+        const result = await cloudinary.uploader.upload(req.file.path)
+        const postz = await ModelPost.create({
+                   post: req.body.post,
+                   img: {
+                       url: result.secure_url,
+                       public_id: result.public_id
+                   },
+                   owner: req.user._id
+               })
+               console.log(postz)
+        
+            const user = await Person.findById(req.user._id)
+        
+            user.posts.push(postz._id)
+            await user.save()
+               res.status(201).json({
+                   postz
+                })   
+    }
+ 
    } catch (error) {
        console.log({ message: error.message})
    }
@@ -58,13 +73,14 @@ postRouter.route('/post/create').post( protect, uploadImage.single('img'), async
 //update post
 postRouter.route('/postupdate/:id').put(protect, uploadImage.single('img'), async (req, res, next) =>{
     try {
-        console.log(req.file)
+        console.log('Lorem ipsum dolor sit amet consectetur adipisicing elit. Asperiores itaque illum odit temporibus labore dignissimos neque sint eaque culpa iste.')
+       
         const oldId = await ModelPost.findById(req.params.id)
         console.log(oldId)
-     if(req.file.path) {  
+     if(req.file){   
+        console.log(req.file)
          await cloudinary.uploader.destroy(oldId.img.public_id) 
         const result = await cloudinary.uploader.upload(req.file.path)
-        console.log(result)
         const postData = {
             post: req.body.post || oldId.post ,
             img:  {
@@ -80,18 +96,14 @@ postRouter.route('/postupdate/:id').put(protect, uploadImage.single('img'), asyn
         }
        
         const updatedPost = await ModelPost.findByIdAndUpdate(req.params.id, postData, {new: true})
-        console.log(updatedPost)
+        console.log({updatedPost: updatedPost})
       
         res.status(200).json({updatedPost})
     }else{
       const result = oldId.img
        console.log(result)
        const postData = {
-        post: req.body.post || oldId.post ,
-        img:  {
-            url: result.url || oldId.img.url,
-            public_id: result.public_id || oldId.img.public_id,
-        },
+        post: req.body.post ,
         owner: req.user._id,
     }
 
@@ -101,7 +113,7 @@ postRouter.route('/postupdate/:id').put(protect, uploadImage.single('img'), asyn
     }
    
     const updatedPost = await ModelPost.findByIdAndUpdate(req.params.id, postData, {new: true})
-    console.log(updatedPost)
+    console.log({updatedPost: updatedPost})
   
     res.status(200).json({updatedPost})
     } 
@@ -148,6 +160,20 @@ postRouter.route('/allpost').get( protect, async (req, res) => {
         const allPost = await  ModelPost.find({ owner: {
             $in: ids,
         } }).sort({ createdAt: -1 }).populate('owner').exec()
+
+        res.status(200).json({
+            allPost
+        })
+    } catch (error) {
+        console.log(error.message)
+    }
+
+})
+
+postRouter.route('/viewallpost').get( protect, async (req, res) => {
+    try {
+       
+        const allPost = await  ModelPost.find({ }).sort({ createdAt: -1 }).populate('owner').exec()
 
         res.status(200).json({
             allPost
@@ -251,6 +277,20 @@ postRouter.route('/comment/:id').post(protect, async (req, res) => {
         res.status(500)
         throw new Error(error)
     }
+})
+
+postRouter.route('/getcomment/:id').get( protect, async (req, res) => {
+    try {
+       
+        const allPost = await  ModelPost.find({ _id:req.params.id }).sort({ createdAt: -1 }).populate('comments').exec()
+      const comments = allPost.comments
+        res.status(200).json({
+            allPost
+        })
+    } catch (error) {
+        console.log(error.message)
+    }
+
 })
 
 postRouter.route('/updatecomment/:id').put(protect, async(req, res) => {

@@ -60,7 +60,7 @@ export const login = async (req, res) => {
             res.status(400)
             throw new Error('please include your email and password')
         }
-        
+         
         const user = await Person.findOne({ email })
 
         if(!user){
@@ -78,7 +78,7 @@ export const login = async (req, res) => {
        const token = generateToken(user._id)
        console.log(user)
        console.log(token)
-       res.status(200).cookie('token', token, { expires: new Date(Date.now() + 3*60*60*1000), httpOnly: true }).json({
+       res.status(200).cookie('token', token, { expires: new Date(Date.now() + 1*60*60*1000), httpOnly: true }).json({
            user, 
            token,
        })
@@ -114,8 +114,6 @@ console.log('deleted user')
         for( let i=0; i<post.length; i++){
             console.log(post)
             await ModelPost.findById(post[i]).remove()
-        
-
         }
         console.log('Post deleted')
         const profile = await Profile.findOne({ owner: req.user._id })
@@ -126,7 +124,6 @@ console.log('deleted user')
         await user.remove()
         console.log('user deleted')
 
-
         res.status(200).json({
             message: 'user deleted'
         })
@@ -134,8 +131,7 @@ console.log('deleted user')
 
     } catch (error) {
         res.status(500)
-        throw new Error(error)
-        
+        throw new Error(error)    
     }
 }
 

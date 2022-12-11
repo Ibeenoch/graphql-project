@@ -6,7 +6,6 @@ import ModelPost from './modelPost.js';
 const profileSchema = mongoose.Schema({
     handle: {
         type: String,
-        unique: true
     },
     bio: String,
     profilepics:  {
