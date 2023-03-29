@@ -1,34 +1,24 @@
 import express from 'express'
-import dotenv from 'dotenv'
 import cors from 'cors'
-import postRouter from './route/postRoute.js'
-import userRouter from './route/userRoute.js'
-import errorhandler from './middleware/errormiddleware.js'
-import connectDB from './config/db.js'
-import profileRouter from './route/profileRoute.js'
+import { graphqlHTTP } from 'express-graphql'
+import dotenv from 'dotenv'
+import schemas from './model/schemagraphql.js';
+import connectDB from './config/db.js';
 
+dotenv.config();
 
-dotenv.config()
+connectDB();
 
-const app = express()
+const app = express();
 
-app.use(express.json())
-app.use(express.urlencoded( { extended: false} ))
+app.use(express.json());
+app.use(express.urlencoded());
 app.use(cors())
 
+app.use('/graphql', graphqlHTTP({
+  schema: schemas,
+  graphiql: process.env.NODE_ENV === 'development'
+}))
 
-    app.get('/', (req, res) => {
-    res.send('please set to production')
-    })
-
-
-connectDB()
-const PORT = process.env.PORT || 3030
-
-app.use(errorhandler)
-
-app.use('/api', postRouter )
-app.use('/user', userRouter )
-app.use('/profile', profileRouter)
-
-app.listen(PORT, () => { console.log(`app is running on port ${PORT}`) })
+const PORT = process.env.PORT || 3030;
+app.listen(PORT, ()=> { `Server running on port ${PORT}`})
